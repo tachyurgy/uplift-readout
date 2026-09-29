@@ -54,6 +54,9 @@ def _effect(est: float, se: float, alpha: float = 0.05) -> Effect:
     return Effect(float(est), float(se), float(est - z * se), float(est + z * se), p)
 
 
+effect = _effect
+
+
 def diff_in_means(mean_t, var_t, n_t, mean_c, var_c, n_c, alpha=0.05) -> Effect:
     """Welch/Neyman difference in means from per-arm moments."""
     se = np.sqrt(var_t / n_t + var_c / n_c)

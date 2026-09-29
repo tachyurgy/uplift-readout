@@ -99,3 +99,35 @@ def test_uplift_curve_rewards_oracle():
     y = (rng.random(n) < 0.05 + 0.08 * x * t).astype(float)
     g, oracle = uplift.uplift_curve(x, t, y)
     assert uplift.qini_coefficient(g, oracle) > 0.3
+
+
+def test_score_curve_matches_diff_in_means_under_randomization():
+    rng = np.random.default_rng(2)
+    n = 400_000
+    x = rng.random(n)
+    t = (rng.random(n) < 0.85).astype(float)
+    y = (rng.random(n) < 0.05 + 0.04 * x * t).astype(float)
+    # IPW score with the known propensity is a valid psi
+    psi = y * (t / 0.85 - (1 - t) / 0.15)
+    g, a = uplift.uplift_curve(x, t, y)
+    _, b = uplift.uplift_curve_scores(x, psi, g)
+    assert np.max(np.abs(a - b)) < 0.004
+    assert b[-1] == pytest.approx(0.02, abs=0.002)
+
+
+def test_aipw_recovers_effect_under_confounded_assignment():
+    """Assignment depends on x and x drives y: diff-in-means is biased, AIPW is not."""
+    rng = np.random.default_rng(4)
+    n = 400_000
+    x = rng.normal(size=n)
+    e = 1 / (1 + np.exp(-(1.7 + 0.5 * x)))
+    t = (rng.random(n) < e).astype(float)
+    y = 1.0 + 2.0 * x + 0.3 * t + rng.normal(size=n)
+    naive = y[t == 1].mean() - y[t == 0].mean()
+    mu1, mu0 = 1.3 + 2.0 * x, 1.0 + 2.0 * x
+    psi = mu1 - mu0 + t * (y - mu1) / e - (1 - t) * (y - mu0) / (1 - e)
+    assert abs(naive - 0.3) > 0.2
+    assert psi.mean() == pytest.approx(0.3, abs=0.02)
+    # and with a wrong outcome model it is still consistent (double robustness)
+    psi_bad = 0 + t * y / e - (1 - t) * y / (1 - e)
+    assert psi_bad.mean() == pytest.approx(0.3, abs=0.05)
