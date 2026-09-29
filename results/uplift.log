@@ -1,0 +1,2 @@
+fold 0 visit: S-learner qini=0.836, T-learner qini=0.657, X-learner qini=0.693, Transformed outcome qini=0.540, Random qini=0.041 [126s]
+fold 0 conversion: S-learner qini=0.808, T-learner qini=0.455, X-learner qini=0.470, Transformed outcome qini=0.335, Random qini=-0.036 [261s]

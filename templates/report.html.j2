@@ -1,0 +1,242 @@
+{%- set va = r.aipw.visit -%}{%- set ca = r.aipw.conversion -%}
+{%- set vn = r.ate.visit -%}{%- set cn = r.ate.conversion -%}
+{%- set pl = d.per_learner -%}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uplift Readout</title>
+<meta name="description" content="Experiment readout and uplift-targeting analysis of the Criteo Uplift v2.1 dataset (13.98M users): SRM and balance checks, doubly robust effect estimates, variance reduction, power and sequential testing, and S/T/X-learner targeting evaluated on held-out data.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fbfaf7;--surface:#ffffff;--ink:#1b1b1a;--ink2:#5b5a55;--muted:#8a8880;--rule:#e4e3de;--accent:#2a78d6;--callout:#f1f5fb;
+  --c-ink:#1b1b1a;--c-ink2:#5b5a55;--c-grid:#e4e3de;--c-s1:#2a78d6;--c-s2:#eb6834;--c-s3:#1baf7a;--c-s4:#eda100;--c-neutral:#9a9890;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161615;--surface:#1d1d1c;--ink:#f1f0ea;--ink2:#c3c2b7;--muted:#8f8d84;--rule:#34332f;--accent:#3987e5;--callout:#1c2430;
+  --c-ink:#f1f0ea;--c-ink2:#c3c2b7;--c-grid:#34332f;--c-s1:#3987e5;--c-s2:#d95926;--c-s3:#199e70;--c-s4:#c98500;--c-neutral:#77756d;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#161615;--surface:#1d1d1c;--ink:#f1f0ea;--ink2:#c3c2b7;--muted:#8f8d84;--rule:#34332f;--accent:#3987e5;--callout:#1c2430;
+  --c-ink:#f1f0ea;--c-ink2:#c3c2b7;--c-grid:#34332f;--c-s1:#3987e5;--c-s2:#d95926;--c-s3:#199e70;--c-s4:#c98500;--c-neutral:#77756d;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.62 "Source Serif 4",Georgia,serif;}
+main{max-width:760px;margin:0 auto;padding:48px 20px 96px}
+h1,h2,h3{font-family:Inter,system-ui,sans-serif;letter-spacing:-.01em;line-height:1.25}
+h1{font-size:2.1rem;margin:.2em 0 .3em;font-weight:600}
+h2{font-size:1.4rem;margin:2.6em 0 .6em;padding-top:1.2em;border-top:1px solid var(--rule);font-weight:600}
+h3{font-size:1.08rem;margin:2em 0 .4em;font-weight:600}
+.kicker{font:500 .8rem/1.4 Inter,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.dek{font-size:1.15rem;color:var(--ink2);margin:0 0 1.5em}
+p{margin:.7em 0}
+a{color:var(--accent)}
+code,.mono{font:0.86em "JetBrains Mono",ui-monospace,monospace}
+figure{margin:1.6em 0;padding:16px 12px 10px;background:var(--surface);border:1px solid var(--rule);border-radius:10px}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font:.86rem/1.5 Inter,sans-serif;color:var(--ink2);margin-top:8px;padding:0 4px}
+figcaption b{color:var(--ink)}
+.memo{background:var(--callout);border-radius:12px;padding:22px 24px;margin:1.5em 0}
+.memo h2{border:0;margin:0 0 .4em;padding:0;font-size:1.2rem}
+.memo ul{margin:.4em 0 0;padding-left:1.2em}.memo li{margin:.45em 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1.4em 0}
+.stat{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.stat .v{font:600 1.45rem/1.2 Inter,sans-serif}
+.stat .l{font:.78rem/1.35 Inter,sans-serif;color:var(--ink2);margin-top:4px}
+.tw{overflow-x:auto;margin:1.2em 0;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font:.86rem/1.45 Inter,sans-serif;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+th{font-weight:600;color:var(--ink2);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+.note{font:.88rem/1.55 Inter,sans-serif;color:var(--ink2);border-left:3px solid var(--rule);padding-left:12px;margin:1.2em 0}
+.flag{border-left-color:var(--c-s2)}
+details{font:.9rem/1.55 Inter,sans-serif;margin:1em 0;color:var(--ink2)}
+summary{cursor:pointer;color:var(--ink)}
+footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--rule);font:.82rem/1.6 Inter,sans-serif;color:var(--muted)}
+nav.toc{font:.88rem/1.7 Inter,sans-serif;margin:1em 0 0}
+nav.toc a{color:var(--ink2);text-decoration:none;margin-right:14px;white-space:nowrap}
+@media (max-width:560px){body{font-size:16px}main{padding:28px 16px 64px}h1{font-size:1.65rem}.memo{padding:18px 16px}figure{padding:10px 6px 6px}}
+</style>
+</head>
+<body>
+<main>
+<div class="kicker">Experiment readout · Criteo Uplift v2.1 · {{ r.source_rows|fmtint }} users</div>
+<h1>Should everyone keep seeing this campaign?</h1>
+<p class="dek">A decision memo for a growth team: is the ad campaign working, how sure are we, and if we stop showing it to everyone, who should still get it?</p>
+<nav class="toc"><a href="#memo">Recommendation</a><a href="#readout">1 · Readout</a><a href="#power">2 · Power &amp; design</a><a href="#uplift">3 · Targeting</a><a href="#limits">4 · Limitations</a><a href="#repro">Reproduce</a></nav>
+
+<section class="memo" id="memo">
+<h2>The short version</h2>
+<ul>
+<li><b>The campaign works.</b> Showing it lifts the conversion rate by <b>{{ ca.ate.estimate|pp(3) }}</b> (95% CI {{ ca.ate.ci_low|pp(3) }} to {{ ca.ate.ci_high|pp(3) }}), a relative lift of <b>{{ ca.relative_lift.estimate|pct(0) }}</b> over users who were held out. That is about {{ '%.1f'|format(d.ate_conv_per_1000) }} extra conversions per 1,000 users targeted.</li>
+<li><b>The effect is far from even.</b> Ranking users with a model trained on other users, the top 20% account for <b>{{ d.top[20].mean|pct(0) }}</b> of the extra conversions and the top 40% for <b>{{ d.top[40].mean|pct(0) }}</b> (ranges across five held-out folds: {{ d.top[20].min|pct(0) }}–{{ d.top[20].max|pct(0) }} and {{ d.top[40].min|pct(0) }}–{{ d.top[40].max|pct(0) }}).</li>
+<li><b>Recommendation:</b> if every targeted user costs at least as much as the average extra value they bring, stop blanket targeting and show the campaign to the top-ranked users only. In the scenario where the cost per targeted user is 1.5× the average incremental value, the best cut-off is the top <b>{{ d.scenarios['1.5'].phi_median|pct(0) }}</b>. At that cut-off the campaign makes money, while showing it to everyone loses money. If a targeted user costs less than half the average value, keep showing it to (nearly) everyone.</li>
+<li><b>One caution before acting:</b> this public sample is not a perfectly clean randomization (§1.2). The headline numbers use an estimator that corrects for it. A naive comparison would overstate the conversion lift by roughly a fifth ({{ cn.relative_lift.estimate|pct(0) }} vs {{ ca.relative_lift.estimate|pct(0) }}).</li>
+</ul>
+</section>
+
+<figure>
+{{ charts.hero }}
+<figcaption><b>The one chart that matters.</b> Users ranked by predicted uplift ({{ d.best }}, trained on other users). The curve shows how much of the campaign's total extra conversions you keep if you target only the top X%. The dashed diagonal is random targeting. The line is the mean over five held-out folds; the band spans the folds.</figcaption>
+</figure>
+
+<h2 id="readout">1 · Experiment readout</h2>
+<p>The data are {{ r.source_rows|fmtint }} users from Criteo incrementality tests. Treated users were eligible to see the campaign's ads, and control users were held out. Two outcomes: whether the user <i>visited</i> the advertiser's site, and whether they <i>converted</i>. Twelve anonymized features were recorded before treatment. Everything below is computed on all rows, with DuckDB aggregates over a parquet file (peak memory under 2&nbsp;GB).</p>
+
+<h3>1.1 Was the split what the design said it was?</h3>
+<p>The test was designed as an 85/15 split. The observed treated share is {{ '%.7f'|format(r.srm.observed_share) }} ({{ r.srm.n_treat|fmtint }} treated, {{ r.srm.n_control|fmtint }} control). A chi-square sample-ratio-mismatch test against 0.85 gives χ² = {{ r.srm.chi2|sci }}, p = {{ r.srm.p_value|f(3) }}. There is no sample ratio mismatch. (Testing against a naive 50/50 expectation would "fail" with p ≈ {{ '%.0g'|format(r.srm_vs_5050_p) }}, which is why the test has to be run against the design ratio.)</p>
+
+<h3>1.2 Covariate balance: the check that fails</h3>
+<p>Randomization should make the two groups look alike before treatment. With groups this large, chance alone produces standardized mean differences (SMD) with a standard deviation of about {{ '%.5f'|format(r.balance_smd_null_sd) }}. The observed SMDs reach <b>{{ r.balance_max_abs_smd|f(3) }}</b>. All {{ r.balance_n_sig_holm }} of 12 features differ significantly after Holm correction. A gradient-boosted model can predict treatment from the features on held-out rows with AUC {{ r.propensity.auc_out_of_fold|f(4) }}. Twenty label permutations give a maximum AUC of {{ r.propensity.auc_permutation_max|f(4) }}.</p>
+<figure>
+{{ charts.balance }}
+<figcaption><b>Standardized mean difference by feature.</b> The grey band is the ±1.96 SD range that pure chance would produce at this sample size (it is almost invisibly thin). Orange: raw groups. Blue: after reweighting by the cross-fitted propensity score, which cuts the worst imbalance from {{ r.balance_max_abs_smd|f(3) }} to {{ r.balance_max_abs_smd_weighted|f(3) }}, still well above chance.</figcaption>
+</figure>
+<p class="note flag">This fits the dataset's own documentation. The release was assembled from several incrementality tests and, for privacy, was <i>"sub-sampled non-uniformly so that the original incrementality level cannot be deduced."</i> Either could tie assignment to the features. The practical consequence is that a raw treated-minus-control difference is not a clean causal estimate here. The analysis therefore treats assignment as <i>random conditional on the features</i>, with an estimated propensity e(x). Its middle 90% spans {{ r.propensity.quantiles.p05|f(3) }}–{{ r.propensity.quantiles.p95|f(3) }}, so overlap is excellent. The headline estimator is augmented inverse-propensity weighting (AIPW, doubly robust), with nuisance models cross-fitted on two halves of the data.</p>
+
+<h3>1.3 Average treatment effect</h3>
+<div class="stats">
+<div class="stat"><div class="v">{{ ca.ate.estimate|pp(3) }}</div><div class="l">conversion effect (AIPW)<br>CI {{ ca.ate.ci_low|pp(3) }} to {{ ca.ate.ci_high|pp(3) }}</div></div>
+<div class="stat"><div class="v">{{ ca.relative_lift.estimate|pct(1) }}</div><div class="l">relative conversion lift<br>CI {{ ca.relative_lift.ci_low|pct(1) }} to {{ ca.relative_lift.ci_high|pct(1) }}</div></div>
+<div class="stat"><div class="v">{{ va.ate.estimate|pp(2) }}</div><div class="l">visit effect (AIPW)<br>CI {{ va.ate.ci_low|pp(2) }} to {{ va.ate.ci_high|pp(2) }}</div></div>
+<div class="stat"><div class="v">{{ va.relative_lift.estimate|pct(1) }}</div><div class="l">relative visit lift<br>CI {{ va.relative_lift.ci_low|pct(1) }} to {{ va.relative_lift.ci_high|pct(1) }}</div></div>
+</div>
+<div class="tw"><table>
+<tr><th>Estimate</th><th>Visit</th><th>95% CI</th><th>Conversion</th><th>95% CI</th></tr>
+<tr><td>Control rate (raw)</td><td>{{ vn.rate_c|pct(3) }}</td><td></td><td>{{ cn.rate_c|pct(3) }}</td><td></td></tr>
+<tr><td>Treated rate (raw)</td><td>{{ vn.rate_t|pct(3) }}</td><td></td><td>{{ cn.rate_t|pct(3) }}</td><td></td></tr>
+<tr><td>Difference in means, analytic</td><td>{{ vn.ate.estimate|pp(3) }}</td><td>{{ vn.ate.ci_low|pp(3) }} – {{ vn.ate.ci_high|pp(3) }}</td><td>{{ cn.ate.estimate|pp(4) }}</td><td>{{ cn.ate.ci_low|pp(4) }} – {{ cn.ate.ci_high|pp(4) }}</td></tr>
+<tr><td>Difference in means, bootstrap ({{ vn.bootstrap.n_boot|fmtint }} resamples)</td><td></td><td>{{ vn.bootstrap.ate_ci[0]|pp(3) }} – {{ vn.bootstrap.ate_ci[1]|pp(3) }}</td><td></td><td>{{ cn.bootstrap.ate_ci[0]|pp(4) }} – {{ cn.bootstrap.ate_ci[1]|pp(4) }}</td></tr>
+<tr><td>Relative lift, naive (delta method)</td><td>{{ vn.relative_lift.estimate|pct(1) }}</td><td>{{ vn.relative_lift.ci_low|pct(1) }} – {{ vn.relative_lift.ci_high|pct(1) }}</td><td>{{ cn.relative_lift.estimate|pct(1) }}</td><td>{{ cn.relative_lift.ci_low|pct(1) }} – {{ cn.relative_lift.ci_high|pct(1) }}</td></tr>
+<tr><td><b>AIPW (doubly robust)</b></td><td><b>{{ va.ate.estimate|pp(3) }}</b></td><td>{{ va.ate.ci_low|pp(3) }} – {{ va.ate.ci_high|pp(3) }}</td><td><b>{{ ca.ate.estimate|pp(4) }}</b></td><td>{{ ca.ate.ci_low|pp(4) }} – {{ ca.ate.ci_high|pp(4) }}</td></tr>
+<tr><td><b>Relative lift, AIPW</b></td><td><b>{{ va.relative_lift.estimate|pct(1) }}</b></td><td>{{ va.relative_lift.ci_low|pct(1) }} – {{ va.relative_lift.ci_high|pct(1) }}</td><td><b>{{ ca.relative_lift.estimate|pct(1) }}</b></td><td>{{ ca.relative_lift.ci_low|pct(1) }} – {{ ca.relative_lift.ci_high|pct(1) }}</td></tr>
+<tr><td>Effect on users actually exposed (AIPW ÷ exposure rate)</td><td>{{ va.wald_exposed.estimate|pp(2) }}</td><td>{{ va.wald_exposed.ci_low|pp(2) }} – {{ va.wald_exposed.ci_high|pp(2) }}</td><td>{{ ca.wald_exposed.estimate|pp(2) }}</td><td>{{ ca.wald_exposed.ci_low|pp(2) }} – {{ ca.wald_exposed.ci_high|pp(2) }}</td></tr>
+</table></div>
+<p>The analytic and bootstrap intervals agree to the displayed precision. The bootstrap resamples rows with replacement; for a binary outcome that is exactly a binomial draw per arm, so it needs no pass over the data. Only {{ r.exposure.rate_t|pct(1) }} of treated users were actually shown an ad, and control users never were. Dividing the intent-to-treat effect by that rate (a Wald / instrumental-variable ratio) estimates the effect on the users who saw it. That assumes being eligible but unexposed has no effect of its own.</p>
+
+<h3>1.4 Tighter intervals from pre-treatment data</h3>
+<p>The twelve features predict the outcomes well, so adjusting for them removes noise. CUPED uses one pooled linear coefficient. Lin's estimator lets the slope differ by arm. CUPAC uses a cross-fitted gradient-boosted prediction as the single covariate.</p>
+<figure>
+{{ charts.estimators }}
+<figcaption><b>Every estimator, point and 95% CI.</b> Grey is the raw difference in means; blue are regression adjustments; orange is AIPW. The shift from grey to the rest is the imbalance correction from §1.2. The narrowing is the variance reduction.</figcaption>
+</figure>
+<div class="tw"><table>
+<tr><th>Estimator</th><th>Visit effect</th><th>Variance vs raw</th><th>Conversion effect</th><th>Variance vs raw</th></tr>
+{%- for name, e in r.variance_reduction.visit.items() %}{% set c = r.variance_reduction.conversion[name] %}
+<tr><td>{{ name }}</td><td>{{ e.estimate|pp(3) }}</td><td>{{ e.variance_ratio|pct(0) }}</td><td>{{ c.estimate|pp(4) }}</td><td>{{ c.variance_ratio|pct(0) }}</td></tr>
+{%- endfor %}
+</table></div>
+<p>CUPAC cuts the variance of the visit estimate to {{ r.variance_reduction.visit['CUPAC, cross-fitted GBM score'].variance_ratio|pct(0) }} of the raw estimator's. That is the same precision as running the test on {{ (1/r.variance_reduction.visit['CUPAC, cross-fitted GBM score'].variance_ratio)|f(2) }}× as many users. For the rare conversion outcome the gain is smaller ({{ r.variance_reduction.conversion['CUPAC, cross-fitted GBM score'].variance_ratio|pct(0) }}). AIPW is less precise than the pure regression adjustments on conversion ({{ r.variance_reduction.conversion['AIPW, cross-fitted GBM'].variance_ratio|pct(0) }} of raw variance), because inverse-propensity terms add noise when outcomes are rare. It is used as the headline anyway because it is the only estimator here that still works if the outcome model is wrong. The adjusted point estimates disagree with each other by more than their own intervals (visit: {{ r.variance_reduction.visit['CUPAC, cross-fitted GBM score'].estimate|pp(2) }} to {{ r.variance_reduction.visit['Lin interacted regression'].estimate|pp(2) }}). That is model dependence left over after the imbalance, so the quoted CIs understate the real uncertainty.</p>
+
+<h3>1.5 Who responds more? Segment effects</h3>
+<p>Each feature was cut at its deciles. Several features have one dominant value, so only {{ r.hte_summary.features_with_bins|length }} of 12 split into two or more segments, giving {{ r.hte_summary.n_tests }} segment-by-outcome effects. Each segment's effect is the mean AIPW score of its users. Correcting for {{ r.hte_summary.n_tests }} comparisons, {{ r.hte_summary.n_sig_holm }} remain significant under Holm (family-wise) and {{ r.hte_summary.n_sig_bh }} under Benjamini–Hochberg (false discovery rate). <b>{{ r.hte_summary.n_negative_sig_holm }}</b> of them are negative: no segment was measurably harmed. A heterogeneity test per feature (Cochran's Q across its segments, Holm-corrected over {{ r.hte_summary.n_het_tests }} tests) rejects "same effect in every segment" for {{ r.hte_summary.n_het_features_holm }} of {{ r.hte_summary.n_het_tests }}.</p>
+<figure>
+{{ charts.hte }}
+<figcaption><b>Conversion effect by segment</b> for the three features with the most heterogeneity. Segments are ordered from the feature's lowest values to its highest. Dashed: the overall AIPW effect. Grey marks are not significant after Holm correction. The pattern shows why targeting can pay: the effect ranges over an order of magnitude between segments.</figcaption>
+</figure>
+
+<h2 id="power">2 · Power and design</h2>
+<h3>2.1 How big does the next test need to be?</h3>
+<p>The control conversion rate is {{ p.power.conversion.baseline|pct(3) }}. At rates that low, small relative lifts need very large samples. With {{ (p.n_total/1e6)|f(1) }}M users at 85/15, the smallest detectable conversion lift (80% power, two-sided α = 0.05) is {{ p.power.conversion.mde_abs_this_n_8515|pp(4) }}, or {{ p.power.conversion.mde_rel_this_n_8515|pct(1) }} relative. The 85/15 allocation costs precision. Its variance is {{ p.allocation_penalty|f(2) }}× that of a 50/50 split of the same size, so a test that reserves few users for control needs about twice as many users in total.</p>
+<figure>
+{{ charts.power }}
+<figcaption><b>Users needed to detect a given relative lift in conversion</b> at the observed control rate (80% power, α = 0.05, unpooled two-proportion z-test).</figcaption>
+</figure>
+<div class="tw"><table>
+<tr><th>Relative lift to detect</th><th>Users, 50/50</th><th>Users, 85/15</th></tr>
+{%- for row in p.power.conversion.table %}
+<tr><td>{{ row.rel_mde|pct(1) }}</td><td>{{ row.n_5050|fmtint }}</td><td>{{ row.n_8515|fmtint }}</td></tr>
+{%- endfor %}
+</table></div>
+<p>An effect as large as the one measured here ({{ p.power.conversion.observed_rel_lift|pct(0) }} relative) needs only {{ p.power.conversion.n_for_observed_8515|fmtint }} users at 85/15. With CUPAC's variance ratio that falls to about {{ p.power.conversion.n_for_observed_8515_cupac|fmtint }}. The next useful test is a <i>targeted</i> one (§3). The effects it has to detect are smaller, so the table above is the one to plan with.</p>
+
+<h3>2.2 Why you cannot stop the test the first time it looks significant</h3>
+<p>This section simulates {{ p.sequential.n_sims|fmtint }} experiments per setting in which the treatment does nothing, and checks the p-value after each batch of data. Stopping at the first p &lt; 0.05 inflates the false-positive rate well past the promised 5%:</p>
+<figure>
+{{ charts.peeking }}
+<figcaption><b>False positive rate when stopping at the first "significant" look.</b> With {{ p.peeking_fpr_by_looks[5].looks }} looks it is {{ p.peeking_fpr_by_looks[5].fpr|pct(1) }}; with {{ p.peeking_fpr_by_looks[-1].looks }} looks, {{ p.peeking_fpr_by_looks[-1].fpr|pct(1) }}. Monte Carlo standard errors are below {{ '%.2f'|format(100*p.peeking_fpr_by_looks[-1].se) }} percentage points.</figcaption>
+</figure>
+<p>There are two standard fixes. The table below compares them on {{ p.sequential.looks }} equally spaced looks, for a design with 80% power at the planned sample size. <b>Alpha spending</b> (Lan–DeMets with an O'Brien–Fleming-type spending function) fixes the looks in advance and uses very strict thresholds early. <b>mSPRT</b> (a mixture sequential probability ratio test, as used in always-valid p-values) allows checking at any time, with no plan.</p>
+<div class="tw"><table>
+<tr><th>Method</th><th>False positive rate</th><th>Power</th><th>Avg. sample used (if effect is real)</th></tr>
+{%- for m in p.sequential.methods %}
+<tr><td>{{ m.method }}</td><td>{{ m.fpr|pct(1) }}</td><td>{{ m.power|pct(1) }}</td><td>{{ m.expected_sample_fraction_h1|pct(0) }}</td></tr>
+{%- endfor %}
+</table></div>
+<p>Alpha spending keeps the error rate at 5%, gives up little power, and stops early on average when the effect is real. mSPRT is conservative at the planned horizon (its guarantee holds for unlimited looks). Its cost is sample size: if it may run to {{ p.msprt_extended[2].max_sample_multiple|f(1) }}× the planned sample, power reaches {{ p.msprt_extended[2].power|pct(0) }}, while the average sample used is only {{ p.msprt_extended[2].expected_sample_multiple|f(2) }}× the plan. Use alpha spending when the review schedule is fixed. Use mSPRT when stakeholders will look at a live dashboard.</p>
+<details><summary>Simulation details</summary>
+<p>The z-statistic path is a Gaussian random walk (exact for known-variance difference in means; an excellent approximation at thousands of conversions per look). Alpha-spending boundaries were calibrated on an independent set of 400,000 null paths. The mSPRT uses a normal mixing prior with variance τ² = {{ p.sequential.tau2|f(3) }} per look, set to the planned effect size, and rejects when the mixture likelihood ratio exceeds 1/α.</p>
+</details>
+
+<h2 id="uplift">3 · Who should see the campaign? Uplift modeling</h2>
+<p>An uplift model predicts, for each user, how much the campaign changes their chance of converting. Four standard learners were compared, all using LightGBM as the base model:</p>
+<ul>
+<li><b>S-learner</b>: one model with treatment as a feature; uplift = prediction with minus without.</li>
+<li><b>T-learner</b>: separate models for treated and control users.</li>
+<li><b>X-learner</b>: T-learner models impute each user's individual effect; a second stage learns those; the two are blended by the propensity.</li>
+<li><b>Transformed outcome</b>: regress Y·(T/e − (1−T)/(1−e)), whose expectation is the individual effect.</li>
+</ul>
+<p><b>Honest evaluation.</b> Users were split into {{ u.k }} disjoint folds. For each fold, every learner was trained on {{ u.n_train|fmtint }} users drawn from the other four and scored on all ~{{ (u.folds[0].n_test/1e6)|f(1) }}M users of the held-out fold. A slice's uplift is measured with the held-out users' AIPW scores, so it is unbiased even with the imbalance from §1.2. Curves, areas and policy values below never touch training rows, and the spread is across the five folds.</p>
+<figure>
+{{ charts.qini_conv }}
+<figcaption><b>Uplift curves, conversion.</b> Treating the top X% of users produces this many extra conversions per 1,000 users in the population. A good model rises steeply and then flattens; random targeting is the straight dashed line. Bands span the five held-out folds.</figcaption>
+</figure>
+<div class="tw"><table>
+<tr><th>Learner</th><th>Conversion Qini coef.</th><th>Conversion AUUC ×10⁴</th><th>Visit Qini coef.</th><th>Visit AUUC ×10³</th></tr>
+{%- for n in ['T-learner','X-learner','S-learner','Transformed outcome','Random'] %}
+<tr><td>{{ n }}{% if n == d.best %} (best){% endif %}</td>
+<td>{{ pl.conversion[n].qini_mean|f(3) }} ± {{ pl.conversion[n].qini_sd|f(3) }}</td>
+<td>{{ (1e4*pl.conversion[n].auuc_mean)|f(2) }} ± {{ (1e4*pl.conversion[n].auuc_sd)|f(2) }}</td>
+<td>{{ pl.visit[n].qini_mean|f(3) }} ± {{ pl.visit[n].qini_sd|f(3) }}</td>
+<td>{{ (1e3*pl.visit[n].auuc_mean)|f(2) }} ± {{ (1e3*pl.visit[n].auuc_sd)|f(2) }}</td></tr>
+{%- endfor %}
+</table></div>
+<p class="note">AUUC is the area under the uplift curve (per-user scale). The Qini coefficient is the model's area above the random-targeting diagonal, divided by the area under that diagonal: 0 means no better than random, 1 means twice the area. Values are mean ± standard deviation across the five folds. On conversion, the {{ d.best }} has AUUC {{ (1e4*pl.conversion[d.best].auuc_mean)|f(2) }}×10⁻⁴ against {{ (1e4*pl.conversion['Random'].auuc_mean)|f(2) }}×10⁻⁴ for a random ranking. "Best" is picked on the same held-out folds, so its lead over the runner-up is slightly optimistic. The gap between any real learner and random is not.</p>
+<figure>
+{{ charts.qini_visit }}
+<figcaption><b>Uplift curves, visits</b>: same setup, with the visit outcome.</figcaption>
+</figure>
+<h3>Are the predictions calibrated?</h3>
+<figure>
+{{ charts.calibration }}
+<figcaption><b>Predicted vs measured conversion uplift by predicted decile</b> ({{ d.best }}, averaged over the five held-out folds; whiskers are 95% CIs). The ranking is what the targeting decision uses, and it holds: measured uplift rises with the predicted decile. The lowest decile's measured effect is {{ d.low_decile.obs|pp(4) }} (CI {{ d.low_decile.ci[0]|pp(4) }} to {{ d.low_decile.ci[1]|pp(4) }}).</figcaption>
+</figure>
+
+<h3>What is it worth? Policy value under a cost assumption</h3>
+<p>The dataset contains no prices, so costs are stated as a ratio. Let <i>r</i> be the cost of targeting one user divided by the value of one conversion. Targeting the top φ of users is worth V·[uplift(φ) − r·φ] per user in the population, where uplift(φ) is the held-out curve above. The best φ depends only on <i>r</i>:</p>
+<figure>
+{{ charts.policy }}
+<figcaption><b>Best share of users to target as costs rise</b> ({{ d.best }}). Line: median across folds; band: range across folds. The average extra conversion per targeted user is {{ '%.1f'|format(d.ate_conv_per_1000) }} per 1,000, so blanket targeting breaks even at <i>r</i> = {{ '%.1f'|format(d.ate_conv_per_1000*10) }} on this axis.</figcaption>
+</figure>
+<div class="tw"><table>
+<tr><th>Scenario: cost per targeted user</th><th>Best share to target</th><th>Net value, best policy</th><th>Net value, target everyone</th></tr>
+{%- for k, lab in [('0.5','0.5× avg. incremental value (cheap)'),('1.0','1.0× (break-even for blanket)'),('1.5','1.5× (expensive)')] %}{% set s = d.scenarios[k] %}
+<tr><td>{{ lab }}</td><td>{{ s.phi_median|pct(0) }} ({{ s.phi_min|pct(0) }}–{{ s.phi_max|pct(0) }})</td><td>{{ '%+.2f'|format(1e4*s.net_best) }}</td><td>{{ '%+.2f'|format(1e4*s.net_all) }}</td></tr>
+{%- endfor %}
+</table></div>
+<p class="note">Net value is in conversions-worth per 10,000 users in the population (multiply by the value of a conversion to get money), averaged over the five held-out folds. Ranges are across folds.</p>
+
+<h2 id="limits">4 · Recommendation and limitations</h2>
+<p><b>For the growth team, in plain terms:</b> the campaign causes real extra conversions, and most of them come from a minority of users that a model can find ahead of time. If showing the ad is cheap relative to what a conversion is worth, keep showing it to everyone. The extra reach still pays, and the table above shows the best policy is to target nearly everyone. If it is expensive, show it only to the top-ranked users. That keeps most of the gain for a fraction of the cost. The next step is to test that directly: a new randomized test comparing "target the model's top slice" against "target everyone", sized with §2 and monitored with alpha spending.</p>
+<p><b>Limitations.</b></p>
+<ul>
+<li><b>The effect sizes are not Criteo's real ones.</b> The release was sub-sampled on purpose so that the true incrementality cannot be recovered. The directions, the ranking of users and the methods carry over. The exact percentages do not.</li>
+<li><b>The sample is not cleanly randomized</b> (§1.2). The adjusted estimates assume that the anonymized features capture whatever tied assignment to users. They remove most of the measured imbalance but not all of it, and different adjustment models disagree by more than their stated CIs. Treat the headline CI as a lower bound on the true uncertainty.</li>
+<li><b>Anonymized features.</b> The features are random projections of the originals. Segments can be targeted but not explained: we cannot say <i>who</i> the high-uplift users are in business terms.</li>
+<li><b>Ad context and external validity.</b> These are historical tests for particular advertisers and placements. Uplift models age as creatives, auctions and audiences change, so a targeting policy needs its own holdout to stay honest.</li>
+<li><b>Costs are assumed.</b> No prices are in the data; the policy results are stated as cost-to-value ratios so they can be re-read with real numbers.</li>
+</ul>
+
+<h2 id="repro">Reproduce</h2>
+<p>Code, tests and this page are generated from one repository: <a href="https://github.com/tachyurgy/uplift-readout">github.com/tachyurgy/uplift-readout</a>. <code>make data</code> downloads and checksums the file and converts it to parquet. <code>make analysis</code> runs the nuisance models, readout, power simulations and uplift models (about 30 minutes on a laptop, under 2&nbsp;GB of memory). <code>make site</code> renders this page from the result files; no number on it is typed by hand.</p>
+<footer>
+Data: Criteo AI Lab, <i>Criteo Uplift Prediction Dataset v2.1</i>, licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>. E. Diemert, A. Betlei, C. Renaudin, M.-R. Amini, "A Large Scale Benchmark for Uplift Modeling," AdKDD &amp; TargetAd Workshop, KDD 2018. This analysis is shared under the same licence. Methods: Deng et al. (2013) CUPED; Lin (2013) regression adjustment; Robins, Rotnitzky &amp; Zhao (1994) and Chernozhukov et al. (2018) AIPW and cross-fitting; Lan &amp; DeMets (1983) alpha spending; Johari et al. (2017) mSPRT; Künzel et al. (2019) meta-learners; Athey &amp; Imbens (2015) transformed outcome.
+</footer>
+</main>
+</body>
+</html>
