@@ -58,8 +58,8 @@ def main():
     t0 = time.time()
     c = duckdb.connect()
     c.execute("SET memory_limit='2GB'; SET threads=4")
-    c.execute(f"CREATE VIEW d AS SELECT *, (hash(rid * 7919 + 13) % {K})::INTEGER AS k5 FROM read_parquet('{PARQUET}') "
-              f"JOIN read_parquet('{ROOT / 'data' / 'nuisance.parquet'}') USING (rid)")
+    c.execute(f"CREATE VIEW d AS SELECT *, (hash(rid * 7919 + 13) % {K})::INTEGER AS k5 FROM read_parquet('{PARQUET}') AS a "
+              f"JOIN read_parquet('{ROOT / 'data' / 'nuisance.parquet'}') AS b USING (rid)")
     e = c.execute("SELECT avg(treatment) FROM d").fetchone()[0]
     res = {"k": K, "n_train": N_TRAIN, "propensity": e, "grid": GRID.tolist(), "folds": []}
     for k in range(K):

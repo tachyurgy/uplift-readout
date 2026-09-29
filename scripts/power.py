@@ -32,7 +32,7 @@ def main():
             rows.append({"rel_mde": rel,
                          "n_5050": stats.sample_size_two_prop(pc, rel, 0.5),
                          "n_8515": stats.sample_size_two_prop(pc, rel, 0.85)})
-        observed_rel = r["ate"][y]["relative_lift"]["estimate"]
+        observed_rel = r["aipw"][y]["relative_lift"]["estimate"]
         calc[y] = {
             "baseline": pc,
             "table": rows,
@@ -88,6 +88,19 @@ def main():
                     "expected_sample_fraction_h1": float(exp_n), "bounds": [float(x) for x in b]})
     # sanity: the closed-form mSPRT boundary agrees with the likelihood-ratio rule
     assert abs(sequential.msprt_reject(z0, tau2).mean() - seq[3]["fpr"]) < 1e-9
+    # what always-valid monitoring costs: let the mSPRT run past the planned horizon
+    ext = []
+    for mult in (1.0, 1.5, 2.0, 3.0):
+        Km = int(round(K * mult))
+        # same per-look drift as the planned design, so the planned horizon is look K
+        z1m = sequential.simulate_z_paths(n_sims, Km, drift * np.sqrt(Km / K), seed=9)
+        km = np.arange(1, Km + 1)
+        bm = np.sqrt((2 * (1 + km * tau2) / tau2) * (np.log(20) - 0.5 * np.log(1 / (1 + km * tau2))) / km)
+        stop = sequential.first_crossing_look(z1m, bm)
+        ext.append({"max_sample_multiple": mult, "power": float((stop > 0).mean()),
+                    "expected_sample_multiple": float(np.where(stop > 0, stop, Km).mean() / K)})
+        del z1m
+    res["msprt_extended"] = ext
     res["sequential"] = {"looks": K, "n_sims": n_sims, "drift": float(drift), "tau2": float(tau2), "methods": seq}
     (OUT / "power.json").write_text(json.dumps(res, indent=1))
     print(json.dumps({k: v for k, v in res.items() if k != "power"}, indent=1)[:3000])
