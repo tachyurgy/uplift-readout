@@ -39,16 +39,21 @@ def t_learner(X, t, y, X_new, seed=0, return_models=False):
     return (tau, m1, m0) if return_models else tau
 
 
-def x_learner(X, t, y, X_new, propensity, seed=0):
-    """Kunzel et al. (2019). Stage 1 = T-learner outcome models; stage 2 regresses
-    imputed individual effects in each arm; combined with the known propensity."""
+def x_learner(X, t, y, X_new, propensity, seed=0, outcome_models=None):
+    """Kunzel et al. (2019). Stage 1 = T-learner outcome models (pass them in to
+    reuse a fitted T-learner); stage 2 regresses imputed individual effects in
+    each arm; the two are blended with the known propensity."""
     tb = t.astype(bool)
-    _, m1, m0 = t_learner(X, t, y, X[:1], seed, return_models=True)
+    if outcome_models is None:
+        _, m1, m0 = t_learner(X, t, y, X[:1], seed, return_models=True)
+    else:
+        m1, m0 = outcome_models
     d1 = y[tb] - m0.predict_proba(X[tb])[:, 1]
     d0 = m1.predict_proba(X[~tb])[:, 1] - y[~tb]
     g1 = _reg(seed).fit(X[tb], d1)
     g0 = _reg(seed).fit(X[~tb], d0)
-    # weight toward the arm-2 model fitted on the larger arm's imputations
+    # g(x) = e g0(x) + (1-e) g1(x): with e = 0.85 most weight goes to g0, whose
+    # imputations use m1, the outcome model fitted on the large treated arm
     return propensity * g0.predict(X_new) + (1 - propensity) * g1.predict(X_new)
 
 
