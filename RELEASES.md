@@ -1,0 +1,7 @@
+# Releases
+
+## 2026-09-29 — First public release
+- **What deployed:** https://uplift.levelbrook.com (Cloudflare Pages project `uplift-readout`): the full experiment readout and uplift-targeting report on Criteo Uplift v2.1 (13,979,592 rows), 10 inline SVG charts, light/dark themes, mobile layout.
+- **Changed:** initial release. SRM, covariate balance and propensity diagnostics; difference-in-means, bootstrap, CUPED, Lin, CUPAC and cross-fitted AIPW effects; Holm/BH segment effects; power/MDE tables, peeking simulation, alpha spending and mSPRT; S/T/X/transformed-outcome learners on 5 held-out folds with uplift curves, Qini, AUUC, calibration and cost-ratio policy value.
+- **How:** `make data && make analysis && make site`, then deploy a staging copy of `site/` with the lbtrack tag installed: `cp -r site _stage && python3 ~/Desktop/lbtrack/install.py _stage && cd _stage && npx wrangler pages deploy . --project-name=uplift-readout --branch=main --commit-dirty=true` (CLOUDFLARE_API_TOKEN=$LEVELBROOK_CF_DEPLOY_TOKEN, CLOUDFLARE_ACCOUNT_ID set). Custom domain via Pages domains API + proxied CNAME `uplift -> uplift-readout.pages.dev`. Pages secrets LBTRACK_KEY / LBTRACK_URL set.
+- **Verified:** 13/13 pytest pass; https://uplift.levelbrook.com returns 200 with 10 `<svg>` charts; headless-Chromium screenshot of the live page shows the hero chart rendered; `POST /e` returns `{"ok":true}`; `/lb.js` 200.
