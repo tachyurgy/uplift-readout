@@ -109,12 +109,12 @@ def chart_hero(S, cost_ratio):
     ax.fill_between(100 * g, 100 * share.min(0), 100 * share.max(0), color=C["s1"], alpha=0.18, lw=0)
     ax.plot(100 * g, 100 * share.mean(0), color=C["s1"], label=f"Target by model ({best})")
     ax.plot([0, 100], [0, 100], color=C["neutral"], lw=1.5, ls="--", label="Target at random")
-    for phi in (0.2, 0.4):
+    for phi in (0.1, 0.3):
         i = int(np.argmin(np.abs(g - phi)))
         v = 100 * share.mean(0)[i]
         ax.plot([100 * phi], [v], "o", ms=7, color=C["s1"], mec="white", mew=2)
-        ax.annotate(f"top {int(phi*100)}% of users\n→ {v:.0f}% of the extra conversions", (100 * phi, v),
-                    xytext=(12, -34), textcoords="offset points", fontsize=10, color=C["ink"])
+        ax.annotate(f"top {int(phi*100)}% of users:\n{v:.0f}% of the extra conversions", (100 * phi, v),
+                    xytext=(14, -38), textcoords="offset points", fontsize=10, color=C["ink"])
     ax.set_xlabel("Share of users shown the campaign (ranked by predicted uplift)")
     ax.set_ylabel("Share of all incremental conversions")
     ax.set_xlim(0, 100); ax.set_ylim(0, 105)
@@ -136,6 +136,7 @@ def chart_estimators(r):
         ax.set_title("Visit rate" if y == "visit" else "Conversion rate", loc="left", color=C["ink"])
         ax.set_xlabel("Effect of treatment (percentage points)")
         ax.grid(axis="y", visible=False)
+    axes[1].tick_params(axis="y", length=0)
     axes[0].set_yticks(range(len(names)))
     axes[0].set_yticklabels([n.replace(", ", ",\n") for n in names])
     axes[0].invert_yaxis()
@@ -173,7 +174,7 @@ def chart_hte(r):
         ax.axhline(100 * overall, color=C["s2"], lw=1.2, ls="--")
         ax.set_title(f"by {t['feature']} bin", loc="left", color=C["ink"])
         ax.set_xticks(xs); ax.set_xticklabels([str(i + 1) for i in xs])
-        ax.set_xlabel("low → high")
+        ax.set_xlabel("feature value: low to high")
         ax.grid(axis="x", visible=False)
     axes[0].set_ylabel("Conversion effect (pp)")
     fig.tight_layout()
@@ -281,12 +282,16 @@ def main():
     # the stated scenario: cost per targeted user equals 1.5x the average incremental
     # conversion value per user, i.e. blanket targeting loses money
     scen = {}
-    for mult in (0.5, 1.0, 1.5):
+    for mult in (0.02, 0.1, 0.5, 1.0, 1.5):
         rr = break_even_policy(cur_best, g, [mult * ate_conv])[0]
         scen[str(mult)] = {"phi_median": float(np.median(rr["phi"])), "phi_min": float(rr["phi"].min()),
                            "phi_max": float(rr["phi"].max()),
                            "net_best": float(rr["net"].mean()), "net_best_sd": float(rr["net"].std(ddof=1)),
                            "net_all": float(rr["net_all"].mean())}
+    # largest cost multiple (of the average effect) at which targeting >= 90% of users is still best
+    fine = [(m, np.median(break_even_policy(cur_best, g, [m * ate_conv])[0]["phi"]))
+            for m in np.round(np.arange(0.0, 0.5001, 0.0025), 4)]
+    blanket_upto = max((m for m, ph in fine if ph >= 0.9), default=0.0)
     top = {int(100 * phi): {"mean": float(captured_share(cur_best, g, phi).mean()),
                             "min": float(captured_share(cur_best, g, phi).min()),
                             "max": float(captured_share(cur_best, g, phi).max())} for phi in (0.1, 0.2, 0.3, 0.4, 0.5)}
@@ -306,7 +311,9 @@ def main():
         "calibration": cal_svg,
         "policy": chart_policy(pol),
     }
-    derived = {"best": best, "top": top, "scenarios": scen, "low_decile": low_decile,
+    derived = {"best": best, "blanket_upto": float(blanket_upto),
+               "naive_over_aipw_rel": r["ate"]["conversion"]["relative_lift"]["estimate"] / r["aipw"]["conversion"]["relative_lift"]["estimate"],
+               "auuc_ratio_conv": float(S["conversion"]["learners"][best]["auuc_mean"] / S["conversion"]["learners"]["Random"]["auuc_mean"]), "top": top, "scenarios": scen, "low_decile": low_decile,
                "ate_conv_per_1000": 1000 * ate_conv,
                "per_learner": {y: {n: {k: float(v[k]) for k in ("qini_mean", "qini_sd", "auuc_mean", "auuc_sd")}
                                    for n, v in S[y]["learners"].items()} for y in S},
